@@ -34,7 +34,7 @@ public class ReadProperties {
     def generate(self, content=None, overrides=None):
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
-        env = {k: v for k, v in os.environ.items() if not k.startswith('ONTOP_PROPERTY_')}
+        env = {k: v for k, v in os.environ.items() if not k.startswith('ONTOP_PROPERTY_') and k != 'ONTOP_PROPERTIES'}
         env.update(TMPDIR=directory.name)
         env.update(overrides or {})
         args = ['java', '-cp', self.classes.name, 'PropertyOverrides']
@@ -68,35 +68,58 @@ public class ReadProperties {
         self.assertEqual(props['ontop.query.defaultTimeout'], '30')
         self.assertEqual(props['jdbc.url'], 'jdbc:duckdb:')
 
-    def test_environment_overrides_preserve_case_and_underscores(self):
-        result, props, _ = self.generate('ontop.query.defaultTimeout=30\n', {
-            'ONTOP_PROPERTY_ontop__query__defaultTimeout': '60',
-            'ONTOP_PROPERTY_jdbc__property__jdbc_stream_results': 'true',
+    def test_environment_overrides_and_adds_exact_property_names(self):
+        result, props, _ = self.generate('ontop.query.defaultTimeout=30\nkeep.me=original\n', {
+            'ONTOP_PROPERTIES': 'ontop.query.defaultTimeout=60\n'
+                                'jdbc.property.jdbc_stream_results=true\n'
+                                'mixed._name=first\nmixed_.name=second\n'
+                                'arbitrary__double_underscore=third',
             'ONTOP_LOG_LEVEL': 'debug'})
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(props['ontop.query.defaultTimeout'], '60')
+        self.assertEqual(props['keep.me'], 'original')
         self.assertEqual(props['jdbc.property.jdbc_stream_results'], 'true')
+        self.assertEqual(props['mixed._name'], 'first')
+        self.assertEqual(props['mixed_.name'], 'second')
+        self.assertEqual(props['arbitrary__double_underscore'], 'third')
         self.assertNotIn('LOG_LEVEL', props)
 
-    def test_values_round_trip_without_injection_or_logging(self):
+    def test_properties_escaping_and_unicode_round_trip_without_logging(self):
+        # The environment contains properties syntax, rather than an unescaped password.
         secret = ' leading space\\path=foo:bar\nnew.property=not-injected\tGrüße ☕ '
-        result, props, _ = self.generate(overrides={'ONTOP_PROPERTY_jdbc__password': secret})
+        text = r'jdbc.password=\ leading space\\path=foo:bar\nnew.property=not-injected\tGrüße ☕ ' + '\n'
+        result, props, _ = self.generate(overrides={'ONTOP_PROPERTIES': text})
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(props['jdbc.password'], secret)
         self.assertNotIn('new.property', props)
         self.assertNotIn(secret, result.stdout + result.stderr)
+        self.assertNotIn(text, result.stdout + result.stderr)
+
+    def test_comments_continuation_and_last_duplicate_wins(self):
+        text = '# comment\n! another comment\nvalue=old\nvalue=first\\\n  second\n'
+        result, props, _ = self.generate(overrides={'ONTOP_PROPERTIES': text})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(props['value'], 'firstsecond')
+
+    def test_empty_environment_preserves_file_settings(self):
+        result, props, _ = self.generate('ontop.query.defaultTimeout=30\n', {'ONTOP_PROPERTIES': ''})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(props['ontop.query.defaultTimeout'], '30')
 
     def test_zero_disables_timeout(self):
-        result, props, _ = self.generate(overrides={'ONTOP_PROPERTY_ontop__query__defaultTimeout': '0'})
+        result, props, _ = self.generate(overrides={'ONTOP_PROPERTIES': 'ontop.query.defaultTimeout=0'})
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(props['ontop.query.defaultTimeout'], '0')
 
-    def test_invalid_timeout_and_empty_key_fail(self):
-        for overrides in [
-            {'ONTOP_PROPERTY_ontop__query__defaultTimeout': v}
-            for v in ['-1', 'abc', '2147483648', '']
-        ] + [{'ONTOP_PROPERTY_': 'value'}]:
-            with self.subTest(overrides=overrides):
-                result, _, _ = self.generate(overrides=overrides)
+    def test_invalid_timeout_and_malformed_block_fail(self):
+        for text in ['ontop.query.defaultTimeout=' + v for v in ['-1', 'abc', '2147483648', '']] + [r'password=secret\uXXXX']:
+            with self.subTest(text=text):
+                result, _, _ = self.generate(overrides={'ONTOP_PROPERTIES': text})
                 self.assertNotEqual(result.returncode, 0)
                 self.assertEqual(result.stdout, '')
+                self.assertNotIn('secret', result.stderr)
+
+    def test_old_encoding_is_rejected_with_migration_guidance(self):
+        result, _, _ = self.generate(overrides={'ONTOP_PROPERTY_ontop__query__defaultTimeout': '60'})
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('use ONTOP_PROPERTIES', result.stderr)

@@ -40,12 +40,13 @@ printf 'arg=%s\\n' "$@"
 
     def test_readonly_nonroot_environment_overrides(self):
         result = self.run_image({'ONTOP_PROPERTIES_FILE': '/input/input.properties',
-                                'ONTOP_PROPERTY_ontop__query__defaultTimeout': '60'})
+                                'ONTOP_PROPERTIES': 'ontop.query.defaultTimeout=60\nextra.key=value'})
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('uid=999', result.stdout)
         self.assertIn('mode=600', result.stdout)
         self.assertIn('ontop.query.defaultTimeout=60', result.stdout)
         self.assertIn('test.marker=original', result.stdout)
+        self.assertIn('extra.key=value', result.stdout)
         self.assertIn('ontop.query.defaultTimeout=30', self.source.read_text())
 
     def test_cli_properties_selection(self):
@@ -60,8 +61,20 @@ printf 'arg=%s\\n' "$@"
                 self.assertNotIn('arg=/input/input.properties', result.stdout)
                 self.assertNotIn('arg=--properties=/input/input.properties', result.stdout)
 
+    def test_environment_only_configuration(self):
+        result = self.run_image({'ONTOP_PROPERTIES': 'ontop.query.defaultTimeout=45\njdbc.property.jdbc_stream_results=true'})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('ontop.query.defaultTimeout=45', result.stdout)
+        self.assertIn('jdbc.property.jdbc_stream_results=true', result.stdout)
+
+    def test_explicit_missing_file_still_fails(self):
+        result = self.run_image({'ONTOP_PROPERTIES_FILE': '/input/missing.properties',
+                                 'ONTOP_PROPERTIES': 'ontop.query.defaultTimeout=45'})
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('Cannot generate', result.stderr)
+
     def test_arbitrary_command_passthrough(self):
-        result = self.run_image({'ONTOP_PROPERTY_': 'invalid, but irrelevant to shell commands'},
+        result = self.run_image({'ONTOP_PROPERTIES': 'bad=\\uXXXX'},
                                 ['sh', '-c', 'printf passthrough'])
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, 'passthrough')

@@ -38,22 +38,28 @@ image retains the upstream non-root user and runtime.
 
 ## Configure
 
-Use `ONTOP_PROPERTY_` followed by the exact property name, with dots encoded as
-**double underscores**. Case and single underscores are preserved:
+Set `ONTOP_PROPERTIES` to a multiline Java properties block. Names are used
+verbatim, with no environment-name encoding:
 
 ```yaml
 environment:
   ONTOP_PROPERTIES_FILE: /opt/ontop/input/faostat.properties
-  ONTOP_PROPERTY_ontop__query__defaultTimeout: "60"
-  ONTOP_PROPERTY_jdbc__property__jdbc_stream_results: "true"
-  ONTOP_PROPERTY_jdbc__property__memory_limit: "1GB"
+  ONTOP_PROPERTIES: |
+    ontop.query.defaultTimeout=60
+    jdbc.property.jdbc_stream_results=true
+    jdbc.property.memory_limit=1GB
 ```
 
-These become `ontop.query.defaultTimeout`, `jdbc.property.jdbc_stream_results`
-and `jdbc.property.memory_limit`. Values are Java-properties escaped, including
-Unicode, newlines and backslashes; they are never logged by the helper.
+The block overrides matching file entries and adds new properties. It accepts
+standard Java properties syntax (comments, continuations and backslash escapes)
+and Unicode text. For literal backslashes or newlines within a value, use the
+usual properties escapes. Property values are never logged by the helper.
+The earlier `ONTOP_PROPERTY_*` convention is rejected with migration guidance.
 
-Precedence: property environment overrides > selected properties file > default
+Omit `ONTOP_PROPERTIES_FILE` for environment-only configuration. An explicitly
+selected missing or unreadable file fails startup, even if overrides are present.
+
+Precedence: `ONTOP_PROPERTIES` > selected properties file > default
 query timeout of **120 seconds**. Set the timeout to `0` to disable it. Existing
 upstream variables such as `ONTOP_DB_URL` and `ONTOP_LOG_LEVEL` still work;
 explicit upstream JDBC/CLI options retain their normal precedence. No engine

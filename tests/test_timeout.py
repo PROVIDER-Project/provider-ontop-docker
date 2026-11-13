@@ -41,7 +41,7 @@ jdbc.property.temp_directory=/tmp/duckdb
                 '--mount', f'type=bind,src={JAR.resolve()},dst=/opt/ontop/jdbc/duckdb_jdbc.jar,readonly',
                 '-e', 'ONTOP_MAPPING_FILE=/input/mapping.ttl',
                 '-e', 'ONTOP_PROPERTIES_FILE=/input/db.properties',
-                '-e', 'ONTOP_PROPERTY_ontop__query__defaultTimeout=1',
+                '-e', 'ONTOP_PROPERTIES=ontop.query.defaultTimeout=1',
                 '-e', 'ONTOP_JAVA_ARGS=-Xms64m -Xmx256m',
                 '-e', 'ONTOP_LOG_LEVEL=info', IMAGE], text=True).strip()
             try:

@@ -1,15 +1,13 @@
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.StringReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
-import java.util.Map;
 import java.util.Properties;
-import java.util.TreeMap;
 
-/** Merge a properties file with explicitly namespaced environment overrides. */
+/** Merge a properties file with the multiline ONTOP_PROPERTIES environment value. */
 public final class PropertyOverrides {
-    private static final String PREFIX = "ONTOP_PROPERTY_";
     private static final String TIMEOUT = "ontop.query.defaultTimeout";
 
     public static void main(String[] args) {
@@ -30,15 +28,18 @@ public final class PropertyOverrides {
             }
         }
         properties.putIfAbsent(TIMEOUT, "120");
-        for (Map.Entry<String, String> entry : new TreeMap<>(System.getenv()).entrySet()) {
-            if (!entry.getKey().startsWith(PREFIX)) {
-                continue;
+        if (System.getenv().keySet().stream().anyMatch(key -> key.startsWith("ONTOP_PROPERTY_"))) {
+            throw new IllegalArgumentException("ONTOP_PROPERTY_* is no longer supported; use ONTOP_PROPERTIES");
+        }
+        String overrides = System.getenv("ONTOP_PROPERTIES");
+        if (overrides != null) {
+            Properties environment = new Properties();
+            try (StringReader reader = new StringReader(overrides)) {
+                environment.load(reader);
+            } catch (IllegalArgumentException error) {
+                throw new IllegalArgumentException("ONTOP_PROPERTIES contains malformed Java properties syntax");
             }
-            String key = entry.getKey().substring(PREFIX.length()).replace("__", ".");
-            if (key.isEmpty()) {
-                throw new IllegalArgumentException("ONTOP_PROPERTY_ requires a property name");
-            }
-            properties.setProperty(key, entry.getValue());
+            properties.putAll(environment);
         }
         try {
             if (Integer.parseInt(properties.getProperty(TIMEOUT)) < 0) {
