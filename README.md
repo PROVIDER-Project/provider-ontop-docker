@@ -4,11 +4,32 @@ A small extension of the official Ontop image: configure properties through
 environment variables, with a finite database query execution timeout by default.
 No Ontop Java code is patched. Dataset images supply their own data and mappings.
 
-## Build
+## Build and publish
 
 ```sh
-docker build -t provider/ontop-runtime:5.5.0-1 .
+make help
+make build
+# After docker login ghcr.io:
+make publish
 ```
+
+The default image is `ghcr.io/provider-project/ontop-fork:5.5.0-1`.
+Tracked `build.conf` contains sourceable `VAR=VAL` version defaults: `VERSION`
+for this image and `ONTOP_VERSION` for the upstream base. Override them on the
+command line, through the environment or in a gitignored `.env` (precedence in
+that order), for example:
+
+```sh
+make publish VERSION=5.5.0-2
+make build REPOSITORY=local/ontop-fork
+```
+
+`build` freely replaces local tags. Only `publish` checks the remote tag before
+building and known manifest digests before pushing. Existing tags/digests or
+registry errors stop publication. If no local manifest digest is available,
+the digest check is skipped with a message. Checks are best-effort and cannot
+prevent races with concurrent publishers. Changing labels or attestations may
+produce another digest even with otherwise equivalent image contents.
 
 The base is `ontop/ontop:5.5.0`, the latest stable release checked on
 [13 November 2026](https://github.com/ontop/ontop/releases/tag/ontop-5.5.0). Override `ONTOP_VERSION` at build time when upgrading.
@@ -48,7 +69,7 @@ with writable `/tmp` (executable too when a JDBC driver extracts native librarie
 Replace the upstream base in a dataset Dockerfile with your published runtime:
 
 ```dockerfile
-FROM provider/ontop-runtime:5.5.0-1 AS data-base
+FROM ghcr.io/provider-project/ontop-fork:5.5.0-1 AS data-base
 # Add the database, JDBC driver, mappings and properties as before.
 ```
 
@@ -69,8 +90,9 @@ recovery. A proxy/client timeout alone does not prove database work has stopped.
 python3 -m unittest discover -s tests -v
 ```
 
-Tests require a JDK. Docker smoke tests can be enabled with
-`ONTOP_RUNTIME_IMAGE=provider/ontop-runtime:5.5.0-1`. Also set
+The Makefile checks use a fake Docker CLI and never push. Property tests require
+a JDK. Docker smoke tests can be enabled with
+`ONTOP_RUNTIME_IMAGE=ghcr.io/provider-project/ontop-fork:5.5.0-1`. Also set
 `DUCKDB_JDBC_JAR=/path/to/duckdb_jdbc.jar` to test actual blocking-query
 cancellation and endpoint recovery with DuckDB.
 
