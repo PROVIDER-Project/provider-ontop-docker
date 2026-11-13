@@ -28,11 +28,13 @@ printf 'arg=%s\\n' "$@"
 ''')
         self.delegate.chmod(0o755)
 
-    def run_image(self, env=None, args=None):
+    def run_image(self, env=None, args=None, entrypoint=None):
         command = ['docker', 'run', '--rm', '--network', 'none', '--read-only',
                    '--tmpfs', '/tmp:rw,size=32m',
                    '--mount', f'type=bind,src={self.root},dst=/input,readonly',
-                   '--mount', f'type=bind,src={self.delegate},dst=/opt/ontop/entrypoint.sh,readonly']
+                   '--mount', f'type=bind,src={self.delegate},dst=/opt/ontop/entrypoint-original.sh,readonly']
+        if entrypoint:
+            command.extend(['--entrypoint', entrypoint])
         for key, value in (env or {}).items():
             command.extend(['-e', key + '=' + value])
         return subprocess.run(command + [IMAGE] + (args or []),
@@ -78,3 +80,12 @@ printf 'arg=%s\\n' "$@"
                                 ['sh', '-c', 'printf passthrough'])
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, 'passthrough')
+
+    def test_downstream_wrapper_using_standard_entrypoint(self):
+        result = self.run_image(
+            {'ONTOP_PROPERTIES_FILE': '/input/input.properties',
+             'ONTOP_PROPERTIES': 'ontop.query.defaultTimeout=55'},
+            ['-c', 'exec /opt/ontop/entrypoint.sh'], entrypoint='/bin/sh')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('ontop.query.defaultTimeout=55', result.stdout)
+        self.assertIn('test.marker=original', result.stdout)

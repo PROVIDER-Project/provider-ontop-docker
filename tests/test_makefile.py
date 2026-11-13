@@ -65,13 +65,13 @@ if args[0]=='build':sys.exit(int(os.environ.get('BUILD_EXIT','0')))
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(len(self.calls()), 1)
         self.assertEqual(self.calls()[0], {'cwd': str(ROOT), 'args': [
-            'build', '--tag', 'ghcr.io/provider-project/ontop-fork:'+version,
+            'build', '--tag', 'ghcr.io/provider-project/provider-ontop:'+version,
             '--build-arg', 'ONTOP_VERSION='+upstream, '.']})
 
     def test_environment_and_command_line_overrides(self):
         result = self.make('build', 'VERSION=2.0.0', 'ONTOP_VERSION=5.4.0', VERSION='1.0.0')
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn('ghcr.io/provider-project/ontop-fork:2.0.0', self.calls()[0]['args'])
+        self.assertIn('ghcr.io/provider-project/provider-ontop:2.0.0', self.calls()[0]['args'])
         self.assertIn('ONTOP_VERSION=5.4.0', self.calls()[0]['args'])
 
     def test_env_file_override(self):

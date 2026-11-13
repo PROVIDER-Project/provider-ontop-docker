@@ -6,14 +6,14 @@ args=("$@")
 case "${1:-}" in
     ""|-*) command=endpoint ;;
     ontop) command=${2:-help} ;;
-    *) exec /opt/ontop/entrypoint.sh "$@" ;;
+    *) exec /opt/ontop/entrypoint-original.sh "$@" ;;
 esac
 case "$command" in
     endpoint|query|materialize|validate|bootstrap|extract-db-metadata) ;;
-    *) exec /opt/ontop/entrypoint.sh "$@" ;;
+    *) exec /opt/ontop/entrypoint-original.sh "$@" ;;
 esac
 for arg in "$@"; do
-    case "$arg" in -h|--help) exec /opt/ontop/entrypoint.sh "$@" ;; esac
+    case "$arg" in -h|--help) exec /opt/ontop/entrypoint-original.sh "$@" ;; esac
 done
 
 # An explicit CLI properties file takes precedence over ONTOP_PROPERTIES_FILE.
@@ -48,4 +48,4 @@ if ((property_index >= 0)); then
         args[property_index]=$runtime_properties
     fi
 fi
-exec /opt/ontop/entrypoint.sh "${args[@]}"
+exec /opt/ontop/entrypoint-original.sh "${args[@]}"

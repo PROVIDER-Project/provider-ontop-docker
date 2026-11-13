@@ -11,7 +11,7 @@ DOCKER ?= docker
 # Source defaults only when no command-line, .env or environment override exists.
 VERSION ?= $(shell . "$(RUNTIME_DIR)/build.conf"; printf '%s' "$$VERSION")
 ONTOP_VERSION ?= $(shell . "$(RUNTIME_DIR)/build.conf"; printf '%s' "$$ONTOP_VERSION")
-REPOSITORY ?= ghcr.io/provider-project/ontop-fork
+REPOSITORY ?= ghcr.io/provider-project/provider-ontop
 IMAGE ?= $(REPOSITORY):$(VERSION)
 
 .PHONY: help build publish _publish-tag-check _publish-build

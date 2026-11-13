@@ -1,4 +1,4 @@
-# Ontop runtime
+# PROVIDER Ontop image
 
 A small extension of the official Ontop image: configure properties through
 environment variables, with a finite database query execution timeout by default.
@@ -13,7 +13,7 @@ make build
 make publish
 ```
 
-The default image is `ghcr.io/provider-project/ontop-fork:5.5.0-1`.
+The default image is `ghcr.io/provider-project/provider-ontop:5.5.0-1`.
 Tracked `build.conf` contains sourceable `VAR=VAL` version defaults: `VERSION`
 for this image and `ONTOP_VERSION` for the upstream base. Override them on the
 command line, through the environment or in a gitignored `.env` (precedence in
@@ -21,7 +21,7 @@ that order), for example:
 
 ```sh
 make publish VERSION=5.5.0-2
-make build REPOSITORY=local/ontop-fork
+make build REPOSITORY=local/provider-ontop
 ```
 
 `build` freely replaces local tags. Only `publish` checks the remote tag before
@@ -75,12 +75,14 @@ with writable `/tmp` (executable too when a JDBC driver extracts native librarie
 Replace the upstream base in a dataset Dockerfile with your published runtime:
 
 ```dockerfile
-FROM ghcr.io/provider-project/ontop-fork:5.5.0-1 AS data-base
+FROM ghcr.io/provider-project/provider-ontop:5.5.0-1 AS data-base
 # Add the database, JDBC driver, mappings and properties as before.
 ```
 
-The existing dataset repos are not changed by this setup. Publish the runtime
-image under your registry namespace before using it in remote builds.
+The wrapper replaces `/opt/ontop/entrypoint.sh`, preserving the standard path
+for downstream startup scripts. It delegates to the original script saved as
+`/opt/ontop/entrypoint-original.sh`. Downstream images may inherit `ENTRYPOINT`
+or call `/opt/ontop/entrypoint.sh` after their own setup.
 
 ## Timeout scope
 
@@ -98,7 +100,7 @@ python3 -m unittest discover -s tests -v
 
 The Makefile checks use a fake Docker CLI and never push. Property tests require
 a JDK. Docker smoke tests can be enabled with
-`ONTOP_RUNTIME_IMAGE=ghcr.io/provider-project/ontop-fork:5.5.0-1`. Also set
+`ONTOP_RUNTIME_IMAGE=ghcr.io/provider-project/provider-ontop:5.5.0-1`. Also set
 `DUCKDB_JDBC_JAR=/path/to/duckdb_jdbc.jar` to test actual blocking-query
 cancellation and endpoint recovery with DuckDB.
 
